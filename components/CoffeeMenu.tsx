@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 
 const featuredCoffees = [
@@ -222,10 +223,10 @@ function RecipeModal({ coffee, isOpen, onClose }: { coffee: typeof featuredCoffe
       • Tasting Notes: ${coffee.tastingNotes.join(', ')}
       
       📖 CARA PENYAJIAN:
-      ${coffee.recipe.penyajian.map((step, index) => `${index + 1}. ${step}`).join('\n')}
+      ${coffee.recipe.penyajian.map((step, idx) => `${idx + 1}. ${step}`).join('\n')}
       
       💪 TIPS KESEHATAN:
-      ${coffee.recipe.kesehatan.map((tip, index) => `• ${tip}`).join('\n')}
+      ${coffee.recipe.kesehatan.map((tip) => `• ${tip}`).join('\n')}
       
       📝 CATATAN PENTING:
       • Konsumsi kopi harus disesuaikan dengan kondisi kesehatan masing-masing individu.
@@ -241,29 +242,19 @@ function RecipeModal({ coffee, isOpen, onClose }: { coffee: typeof featuredCoffe
       ⏰ Download pada: ${new Date().toLocaleString('id-ID')}
     `
 
-    // Buat blob untuk text file
     const textBlob = new Blob([recipeText], { type: 'text/plain' })
-    
-    
-    
-    // Buat URL untuk download
     const textUrl = URL.createObjectURL(textBlob)
-    
-    
-    // Download sebagai text file
     const textLink = document.createElement('a')
     textLink.href = textUrl
     textLink.download = `Resep-${coffee.name.replace(/\s+/g, '-')}.txt`
     document.body.appendChild(textLink)
     textLink.click()
     document.body.removeChild(textLink)
-    
-    // Cleanup
+
     setTimeout(() => {
       URL.revokeObjectURL(textUrl)
     }, 100)
-    
-    // Tampilkan konfirmasi
+
     alert(`✅ Resep "${coffee.name}" berhasil didownload!`)
   }
 
@@ -307,8 +298,8 @@ function RecipeModal({ coffee, isOpen, onClose }: { coffee: typeof featuredCoffe
                       <span className="text-sm font-medium text-gray-700">{coffee.roastLevel}</span>
                     </div>
                     <div className="flex gap-2">
-                      {coffee.tastingNotes.map((note: string, index: number) => (
-                        <span key={index} className="px-2 py-1 bg-white/50 text-xs text-gray-700 rounded-full border border-amber-200">
+                      {coffee.tastingNotes.map((note: string, idx: number) => (
+                        <span key={idx} className="px-2 py-1 bg-white/50 text-xs text-gray-700 rounded-full border border-amber-200">
                           {note}
                         </span>
                       ))}
@@ -344,10 +335,10 @@ function RecipeModal({ coffee, isOpen, onClose }: { coffee: typeof featuredCoffe
                 </div>
               </div>
               <ol className="space-y-3 ml-2">
-                {coffee.recipe.penyajian.map((step: string, index: number) => (
-                  <li key={index} className="flex items-start gap-3 p-3 hover:bg-amber-50/50 rounded-lg transition-colors">
+                {coffee.recipe.penyajian.map((step: string, idx: number) => (
+                  <li key={idx} className="flex items-start gap-3 p-3 hover:bg-amber-50/50 rounded-lg transition-colors">
                     <span className="flex-shrink-0 w-6 h-6 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center text-sm font-medium">
-                      {index + 1}
+                      {idx + 1}
                     </span>
                     <span className="text-gray-700">{step}</span>
                   </li>
@@ -369,8 +360,8 @@ function RecipeModal({ coffee, isOpen, onClose }: { coffee: typeof featuredCoffe
                 </div>
               </div>
               <ul className="space-y-3 ml-2">
-                {coffee.recipe.kesehatan.map((tip: string, index: number) => (
-                  <li key={index} className="flex items-start gap-3 p-3 hover:bg-white/50 rounded-lg transition-colors">
+                {coffee.recipe.kesehatan.map((tip: string, idx: number) => (
+                  <li key={idx} className="flex items-start gap-3 p-3 hover:bg-white/50 rounded-lg transition-colors">
                     <svg className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -436,6 +427,9 @@ export default function CoffeeMenu() {
   const [selectedCoffee, setSelectedCoffee] = useState<typeof featuredCoffees[0] | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
+  // state untuk menandai gambar error per coffee id
+  const [imageErrorMap, setImageErrorMap] = useState<Record<number, boolean>>({})
+
   const handleShowRecipe = (coffee: typeof featuredCoffees[0]) => {
     setSelectedCoffee(coffee)
     setIsModalOpen(true)
@@ -444,26 +438,6 @@ export default function CoffeeMenu() {
   const closeModal = () => {
     setIsModalOpen(false)
     setSelectedCoffee(null)
-  }
-
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>, coffeeId: number) => {
-    const img = e.currentTarget as HTMLImageElement
-    console.log(`Gambar error untuk coffee ID: ${coffeeId}`, img.src)
-    const parent = img.parentElement as HTMLElement | null
-    if (parent) {
-      // Remove the image and show a beautiful placeholder
-      img.style.display = 'none'
-      parent.innerHTML = `
-        <div class="w-full h-full bg-gradient-to-br from-amber-400 to-amber-600 flex flex-col items-center justify-center p-4 relative">
-          <div class="text-5xl mb-2 opacity-80">☕</div>
-          <div class="text-white text-center">
-            <div class="font-bold mb-1">Premium Coffee</div>
-            <div class="text-xs opacity-80">No Image Available</div>
-          </div>
-          <div class="absolute bottom-2 right-2 text-white/30 text-xs">KopiNusa</div>
-        </div>
-      `
-    }
   }
 
   return (
@@ -502,13 +476,25 @@ export default function CoffeeMenu() {
 
             {/* Image Container */}
             <div className="h-56 overflow-hidden relative">
-              <img 
-                src={coffee.image} 
-                alt={coffee.name}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                onError={(e) => handleImageError(e, coffee.id)}
-                onLoad={() => console.log('Gambar berhasil load:', coffee.name)}
-              />
+              {!imageErrorMap[coffee.id] ? (
+                <Image 
+                  src={coffee.image} 
+                  alt={coffee.name}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  onError={() => setImageErrorMap((p) => ({ ...p, [coffee.id]: true }))}
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-amber-400 to-amber-600 flex flex-col items-center justify-center p-4 relative text-white">
+                  <div className="text-5xl mb-2 opacity-80">☕</div>
+                  <div className="text-center">
+                    <div className="font-bold mb-1">Premium Coffee</div>
+                    <div className="text-xs opacity-80">No Image Available</div>
+                  </div>
+                  <div className="absolute bottom-2 right-2 text-white/30 text-xs">KopiNusa</div>
+                </div>
+              )}
               {/* Gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </div>
@@ -535,9 +521,9 @@ export default function CoffeeMenu() {
 
               {/* Tasting notes */}
               <div className="flex flex-wrap gap-1.5 mb-5">
-                {coffee.tastingNotes.map((note, index) => (
+                {coffee.tastingNotes.map((note, idx) => (
                   <span 
-                    key={index}
+                    key={idx}
                     className="px-2 py-1 bg-gray-50 text-gray-700 text-xs rounded-full border border-gray-200"
                   >
                     {note}

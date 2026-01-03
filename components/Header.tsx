@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -24,7 +25,14 @@ export default function Header() {
         <div className="flex justify-between items-center py-4">
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <img src="/logo.png" alt="Logo" className="h-9 w-9 ml-2" />
+            <Image
+              src="/logo.png"
+              alt="Logo"
+              width={36}
+              height={36}
+              className="h-9 w-9 ml-2"
+              priority
+            />
             <span className="text-xl font-bold text-amber-800 ml-2">KopiNusaGPT</span>
           </Link>
 
@@ -46,9 +54,10 @@ export default function Header() {
           </nav>
 
           {/* Mobile Menu Button */}
-          <button 
+          <button
             className="md:hidden text-amber-800"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="Toggle menu"
           >
             <span className="text-2xl">☰</span>
           </button>

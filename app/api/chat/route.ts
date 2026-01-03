@@ -20,12 +20,26 @@ const COFFEE_KNOWLEDGE = {
   }
 }
 
+// helper: aman untuk mengambil pesan error dari `unknown`
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  try {
+    return JSON.stringify(err)
+  } catch {
+    return String(err)
+  }
+}
+
+/** Type definitions **/
+type ChatMessage = { role?: 'user' | 'assistant' | 'system' | string; content?: string }
+type RequestBody = { messages?: ChatMessage[]; mode?: string }
+
 // function untuk memanggil Groq AI API
 async function callGroqAI(systemPrompt: string, userMessage: string) {
   try {
     // mendapatkan API key dari environment variable
     const GROQ_API_KEY = process.env.GROQ_API_KEY
-    
+
     if (!GROQ_API_KEY) {
       throw new Error('Groq API key not configured')
     }
@@ -64,18 +78,17 @@ async function callGroqAI(systemPrompt: string, userMessage: string) {
     }
 
     const data = await response.json()
-    
+
     // Mengetahui response dari Groq AI
-    const aiResponse = data.choices?.[0]?.message?.content
-    
-    if (!aiResponse) {
+    const aiResponse = data?.choices?.[0]?.message?.content
+
+    if (!aiResponse || typeof aiResponse !== 'string') {
       throw new Error('No response from Groq AI')
     }
 
     return aiResponse.trim()
-    
-  } catch (error: any) {
-    console.error('Groq AI error:', error)
+  } catch (error: unknown) {
+    console.error('Groq AI error:', getErrorMessage(error))
     throw error
   }
 }
@@ -83,7 +96,7 @@ async function callGroqAI(systemPrompt: string, userMessage: string) {
 // pesan Fallback responses jika Groq AI tidak merespons
 const getFallbackResponse = (mode: string, userMessage: string) => {
   const message = userMessage.toLowerCase()
-  
+
   if (mode === 'coffee') {
     if (message.includes('menu') || message.includes('harga')) {
       return "Kami punya Kopi Temanggung (Rp15k), Kopi Bali Kintamani (Rp22k), Kopi Flores (Rp18k), Kopi Aceh Gayo (Rp25k). Mana yang mau dicoba? ☕"
@@ -105,7 +118,7 @@ const getFallbackResponse = (mode: string, userMessage: string) => {
     }
     return "Saya merekomendasikan Kopi Temanggung Robusta untuk Anda! Rasanya kuat dan earthy, cocok untuk hari ini. ☕"
   }
-  
+
   // Pesan fallback umum
   if (message.includes('halo') || message.includes('hai') || message.includes('hi')) {
     return "Halo! 👋 Saya AI Assistant siap membantu Anda. Ada yang bisa saya bantu hari ini?"
@@ -118,10 +131,10 @@ const getFallbackResponse = (mode: string, userMessage: string) => {
 
 export async function POST(request: NextRequest) {
   try {
-    // memanggil body dari request
-    const body = await request.json().catch(() => null)
-    
-    if (!body || !body.messages) {
+    // memanggil body dari request dengan aman
+    const rawBody = await request.json().catch(() => null) as unknown
+
+    if (!rawBody || typeof rawBody !== 'object') {
       return NextResponse.json(
         {
           success: false,
@@ -132,7 +145,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { messages, mode = 'coffee' } = body
+    const { messages, mode = 'coffee' } = rawBody as RequestBody
 
     // memastikan messages adalah array yang tidak kosong
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -146,17 +159,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Pastikan setiap message memiliki content string
+    const normalizedMessages: ChatMessage[] = messages.map((m) => ({
+      role: m?.role,
+      content: typeof m?.content === 'string' ? m!.content : ''
+    }))
+
     console.log(`📱 [API] Mode: ${mode}`)
 
     // PROMPT BERDASARKAN MODE
     let systemPrompt = ''
-    
+
     if (mode === 'coffee') {
       systemPrompt = `ANDA ADALAH BARISTA AI WARUNG KOPINUSAOFFICIALGPT.
-      
+
       DATA KHUSUS:
       ${JSON.stringify(COFFEE_KNOWLEDGE, null, 1)}
-      
+
       ATURAN:
       1. Hanya jawab pertanyaan tentang kopi, warung, dan menu kami
       2. Jika ditanya topik lain, jawab: "Maaf, saya hanya bisa membantu tentang kopi dan warung kami"
@@ -166,43 +185,42 @@ export async function POST(request: NextRequest) {
       6. Gunakan gaya percakapan yang santai dan ramah
       7. Apabila menanyakan tentang brewing, berikan tips singkat dan jelas
       8. Apabila kamu ditanya "kamu siapa?", jawab "Saya adalah Barista AI dari KopiNusantaraOfficialGPT yang siap membantu kamu memilih kopi terbaik!"
-      
+
       BAHASA:
       - Gunakan bahasa Indonesia yang santai dan ramah
       - Tambahkan emoji yang sesuai ☕✨😊
       - Bersemangat dan antusias
-      
+
       CONTOH RESPON:
       User: "Rekomendasi kopi untuk pemula"
       AI: "Untuk pemula, saya rekomendasikan Kopi Temanggung Robusta (Rp 15.000) yang kuat namun halus. Cocok untuk membangkitkan semangat! 💪"
-      
+
       User: "Ada promo apa?"
       AI: "Hari ini Senin! Beli 2 Kopi Temanggung gratis 1. Juga ada diskon 20% untuk mahasiswa setiap Rabu. 🎉"`
-      
-    }else {
+    } else {
       // MODE UMUM
       systemPrompt = `Anda adalah asisten AI yang ahli dalam bidang kesehatan.
       Berikan jawaban yang informatif, akurat, dan ramah dalam bahasa Indonesia.
       Gunakan gaya bahasa yang santai dan mudah dipahami.
-      
+
       ATURAN:
       1. Jawab pertanyaan dengan informatif dan jelas
       2. Jika tidak tahu, jangan buat-buat jawaban
       3. Gunakan struktur yang mudah dibaca
       4. Tambahkan emoji yang sesuai untuk membuat respons lebih hidup 😊✨
-      
+
       CONTOH RESPON:
       User: "apa manfaat dari menjaga tubuh tetap sehat?"
       AI: "Tubuh yang sehat memastikan suplai oksigen ke otak berjalan optimal. Hal ini meningkatkan kemampuan kognitif, sehingga Anda bisa bekerja lebih fokus, berpikir jernih, dan tidak mudah merasa lelah saat menghadapi tekanan pekerjaan. 🤖
-      
+
       AI bisa belajar dari data, mengenali pola, membuat keputusan, dan bahkan berinteraksi dengan manusia!"
       `
     }
 
-    // mempersiapakn pesan terakhir dari user ke groq AI
-    const userMessages = messages.filter((msg: any) => msg.role === 'user')
+    // mempersiapkan pesan terakhir dari user ke groq AI
+    const userMessages = normalizedMessages.filter((msg) => msg.role === 'user')
     const lastUserMessage = userMessages[userMessages.length - 1]?.content || ""
-    
+
     console.log(`📤 [API] Sending to Groq AI`)
 
     const controller = new AbortController()
@@ -212,19 +230,18 @@ export async function POST(request: NextRequest) {
     let usedGroqAI = false
 
     try {
-      // meamnggil Groq AI
+      // memanggil Groq AI
       aiResponse = await callGroqAI(systemPrompt, lastUserMessage)
       usedGroqAI = true
       console.log('✅ [API] Groq AI response received')
-      
-    } catch (fetchError: any) {
+    } catch (fetchError: unknown) {
       clearTimeout(timeoutId)
-      console.error('❌ Groq AI error:', fetchError.message)
-      
+      console.error('❌ Groq AI error:', getErrorMessage(fetchError))
+
       // menampilkan fallback local response
       aiResponse = getFallbackResponse(mode, lastUserMessage)
       usedGroqAI = false
-      
+
       console.log('⚠️ [API] Using fallback response')
     }
 
@@ -241,10 +258,10 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     )
 
-  } catch (error: any) {
-    console.error('💥 [API] Unhandled error:', error)
-    
-    if (error.name === 'AbortError') {
+  } catch (error: unknown) {
+    console.error('💥 [API] Unhandled error:', getErrorMessage(error))
+
+    if (error instanceof Error && error.name === 'AbortError') {
       return NextResponse.json(
         {
           success: false,
@@ -258,7 +275,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "Unknown error",
+        error: (error instanceof Error && error.message) ? error.message : "Unknown error",
         fallback: "Terjadi kesalahan sistem. Silakan coba lagi nanti!"
       },
       { status: 200 }

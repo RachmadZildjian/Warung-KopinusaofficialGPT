@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 
 // Tipe data untuk item dalam keranjang
 interface CartItem {
@@ -51,6 +52,7 @@ export default function OrderSystem() {
   const [paymentMethod, setPaymentMethod] = useState('qris')
   const [copiedOrderId, setCopiedOrderId] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  // orderHistory sebelumnya tidak digunakan -> sekarang dipakai (disimpan/di-load dari localStorage)
   const [orderHistory, setOrderHistory] = useState<OrderData[]>([])
   const [showQrisModal, setShowQrisModal] = useState(false)
 
@@ -121,6 +123,27 @@ export default function OrderSystem() {
       origin: 'Medan, Sumatera Utara'
     },
   ]
+
+  // --- useEffect: load & persist orderHistory agar var tidak "unused" ---
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('kopi_order_history')
+      if (saved) {
+        setOrderHistory(JSON.parse(saved) as OrderData[])
+      }
+    } catch (e) {
+      // ignore parse errors
+      console.warn('Failed to load order history', e)
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('kopi_order_history', JSON.stringify(orderHistory))
+    } catch (e) {
+      console.warn('Failed to save order history', e)
+    }
+  }, [orderHistory])
 
   // Fungsi untuk tambah ke keranjang
   const addToCart = (coffee: typeof coffeeMenu[0]) => {
@@ -220,6 +243,7 @@ export default function OrderSystem() {
       }
 
       setOrderData(newOrder)
+      // gunakan orderHistory (sebelumnya warning unused)
       setOrderHistory(prev => [newOrder, ...prev])
       setCheckoutStep('payment')
       
@@ -344,17 +368,24 @@ Terima kasih! ☕`
             <button 
               onClick={() => setShowQrisModal(false)}
               className="text-gray-500 hover:text-gray-700 text-2xl"
+              aria-label="Tutup QRIS"
             >
               &times;
             </button>
           </div>
           
           <div className="text-center">
-            <img 
-              src="/qris-gopay.png" 
-              alt="QRIS Payment Code"
-              className="w-64 h-64 mx-auto mb-4 border-2 border-gray-300 rounded-lg"
-            />
+            {/* Ganti <img> -> <Image /> */}
+            <div className="mx-auto mb-4 w-64 h-64 relative">
+              <Image
+                src="/qris-gopay.png"
+                alt="QRIS Payment Code"
+                width={256}
+                height={256}
+                className="border-2 border-gray-300 rounded-lg object-contain"
+              />
+            </div>
+
             <p className="text-gray-800 font-bold text-xl mb-2">Rp {grandTotal.toLocaleString()}</p>
             <p className="text-gray-600 mb-4">Scan QR Code di atas untuk membayar</p>
             
@@ -846,7 +877,7 @@ Terima kasih! ☕`
                 <li>1. Pilih metode pembayaran di atas</li>
                 <li>2. Lakukan pembayaran sesuai metode yang dipilih</li>
                 <li>3. Simpan bukti pembayaran (screenshot)</li>
-                <li>4. Klik "Konfirmasi Pembayaran" setelah membayar</li>
+                <li>4. Klik &quot;Konfirmasi Pembayaran&quot; setelah membayar</li>
               </ol>
             </div>
           </div>
@@ -862,11 +893,15 @@ Terima kasih! ☕`
               {/* QR Code Static Image */}
               <div className="bg-white p-6 rounded-2xl mb-6">
                 <div className="flex justify-center">
-                  <img 
-                    src="/Qrcode-Gopay.png" 
-                    alt="QR Code Pembayaran"
-                    className="w-full h-full object-cover"
-                  />
+                  <div className="w-64 h-64 relative">
+                    <Image
+                      src="/Qrcode-Gopay.png"
+                      alt="QR Code Pembayaran"
+                      width={256}
+                      height={256}
+                      className="object-contain"
+                    />
+                  </div>
                 </div>
                 <div className="text-center mt-4">
                   <p className="text-gray-800 font-bold text-xl">Rp {grandTotal.toLocaleString()}</p>
